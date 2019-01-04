@@ -1,6 +1,6 @@
-# ai
+# Ensemble_Prediction_using_Stacking
 
-Ensemble_Prediction_using_Stacking
+
 # Data mining task: Prediction of Stroke
 # Data mining technique used: Regression
 
