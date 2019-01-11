@@ -1,0 +1,118 @@
+library(e1071) 
+library(psych)
+library(dplyr)
+library(caret)
+library(caretEnsemble)
+library(GGally)
+library(ggplot2)
+library(monomvn)
+library(randomForest)
+library(kernlab)
+library(elasticnet)
+library(car)
+library(corrplot)
+
+data <- read.csv("insurance.csv")
+glimpse(data)
+colSums(is.na(data))
+data$male=ifelse(data$sex=="male",1,0)
+data$sex=NULL
+data$smoker=ifelse(data$smoker=="yes",1,0)
+head(data)
+describe(data)
+
+hist(data$charges, col = 'lightblue', xlab="charges",main = 'Distribution of Medical Charges')
+
+ggplot(data,aes(bmi))+
+  geom_histogram(aes(y=..density..),col="black",fill="lightblue")+
+  stat_function(fun=dnorm,color="red",args = list(mean=mean(data$bmi),sd=sd(data$bmi)),lwd=1.5)
+
+scatterplot(data$bmi,data$charges, xlab="bmi", ylab="charges",regLine=TRUE,col=carPalette(),main="BMI and charges")
+
+data.frame(prop.table(table(data$children)))%>%
+  ggplot(aes(Var1,Freq))+
+  geom_bar(stat="identity",fill="lightblue",col="black")+
+  geom_text(aes(y=Freq+.01,label=paste0(Freq*nrow(data)," / ",signif(Freq,3)*100)))+
+  labs(x="number of children",y="count / %")
+
+ggplot(data, aes(reorder(children, charges), charges, fill = children))+
+  geom_boxplot()+
+  labs(    title = "Charges by number of children",
+           x = "children")+
+  theme(plot.title = element_text(hjust = .5))
+
+scatter.hist(data$age,data$charges, xlab="age",ylab="charges")
+
+ggplot(data, aes(as.factor(male), charges, fill = as.factor(male)))+
+  geom_boxplot()+
+  labs(title = "Charges by gender",
+       x = "male")+
+  scale_fill_discrete("male")+
+  theme(plot.title = element_text(hjust = .5))
+
+scatterplot(data$region,data$charges,xlab="region",ylab="charges")
+
+scatterplotMatrix(~ age+ region+bmi+charges+children, data=data, col="black", regline=TRUE, main="Full Picture")
+
+data.frame(prop.table(table(data$smoker)))%>%
+  ggplot(aes(Var1,Freq))+
+  geom_bar(stat="identity",fill="lightblue",col="black")+
+  geom_text(aes(y=Freq+.03,label=paste0(Freq*nrow(data)," / ",signif(Freq,3)*100)))+
+  labs(x="smoker",y="count / %")
+
+ggplot(data, aes(as.factor(smoker), charges, fill = as.factor(smoker)))+
+  geom_boxplot()+
+  labs(title = "Smoker's vs Non-smoker's charges",
+       x = "smoker")+
+  scale_fill_discrete("smoker")+
+  theme(plot.title = element_text(hjust = .5))
+
+pm <- ggpairs(data, columns = c("smoker", "bmi","region", "children", "charges"), ggplot2::aes(colour=region))
+p_ <- GGally::print_if_interactive
+p_(pm)
+
+newdata<-data
+for(i in which(sapply(newdata,is.factor))){
+  newdata[,i]<-as.numeric(newdata[,i])
+}
+corrplot::corrplot(cor(newdata),method = "number",type = "upper")
+
+set.seed(123)
+rf<-randomForest(charges~smoker+age+bmi+children+region+male,data,importance = T,ntree = 1000)
+varImpPlot(rf)
+
+children<-as.character(data$children)
+model <-lm(charges ~ smoker+region+bmi+age+male+children+smoker, data)
+summary(model)
+
+par(mfrow=c(2,2))
+plot(model)
+par(mfrow=c(1,1))
+hist(model$residuals, col = 'lightblue', xlab="residuals",main = 'Histogram of Residuals')
+
+train <- createDataPartition(y = data$charges,p = 0.75,list = FALSE)
+training <- data[train,]
+testing <- data[-train,]
+
+fit <- trainControl(method = 'repeatedcv',number = 10, repeats = 5, summaryFunction=defaultSummary)
+
+algorithmList <- c('lm','pls','rf', 'svmRadial')
+
+models <- caretList(charges~., data=training, trControl=fit, methodList=algorithmList, preProcess = c("center","scale"))
+results <- resamples(models)
+summary(results)
+dotplot(results, metric = 'Rsquared')
+
+modelCor(results)
+
+stack.glm <- caretStack(models, method="glm", metric="RMSE", trControl=fit)
+print(stack.glm)
+summary(stack.glm)
+
+prediction <- predict(stack.glm, testing)
+act_pred <- data.frame(obs=testing$charges, pred=prediction)
+defaultSummary(act_pred)
+
+axisRange <- extendrange(c(testing$charges, prediction))
+plot(testing$charges, prediction, ylim = axisRange, xlim = axisRange, main = 'Actual vs Predicted plot')
+abline(0, 1, col = "lightblue", lty = 2)
