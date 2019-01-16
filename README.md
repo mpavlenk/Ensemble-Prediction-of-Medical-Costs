@@ -1,4 +1,4 @@
-[R code link](https://mpavlenk.github.io/Ensemble-Prediction-of-Medical-Costs/Ensemble_Prediction_using_Stacking.html)
+[R code link](https://mpavlenk.github.io/Ensemble-Prediction-of-Medical-Costs/Ensemble_Prediction_of_Medical_Costs.html)
 
 Data mining task: Ensemble Prediction of Medical Cost
 
