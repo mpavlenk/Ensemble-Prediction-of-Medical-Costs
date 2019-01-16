@@ -1,4 +1,5 @@
-library(e1071) 
+library(e1071)
+library(tibble)
 library(psych)
 library(dplyr)
 library(caret)
